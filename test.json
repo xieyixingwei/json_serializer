@@ -1,0 +1,6 @@
+{
+    "name @null": "",
+    "age @nullable": 23,
+    "brothers": ["Tom", "Peter"],
+    "tags": []
+}
