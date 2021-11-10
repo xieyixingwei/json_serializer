@@ -1,0 +1,238 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:collection/collection.dart';
+import 'package:jsonse/http_method.dart';
+import 'package:path/path.dart' as path;
+import 'package:jsonse/member.dart';
+import 'package:jsonse/json_serialize.dart';
+
+String _jsonType(JsonType type) =>
+  type == JsonType.Map ? 'Map<String, dynamic>' : 'List';
+
+class Model {
+
+  Model({
+    required this.jsonSerialize,
+    required this.jsonName,
+    required String jsonSrc }) {
+
+    var obj;
+    try{
+      obj = json.decode(jsonSrc);
+    } catch(e) {
+      print('*** ERROR: from \'${this.jsonName}.json\' parse Json Error: $e');
+      return;
+    }
+
+    keywords.forEach((e) {
+      final name = e["name"] as String;
+      final set = e["set"] as Function(Model, dynamic);
+      if (obj[name] != null) {
+        set(this, obj[name]);
+        obj.remove(name);
+      }
+    });
+
+    modelTypeName = toModelType(jsonName);
+
+    if(obj['__json__'] != null) {
+/*
+      Map<String, dynamic> jsonConfig = obj['__json__'];
+      obj.remove('__json__');
+
+      jsonType = jsonConfig['type'] is List ? JsonType.List : jsonType;
+
+      String key = jsonConfig['member'].keys.first;
+      dynamic value = jsonConfig['member'].values.first;
+      members.add(Member(key, value, this, serializeTool, jsonType: jsonType));
+*/
+    }
+    else {
+      obj.forEach((String key, dynamic value) {
+        members.add(Member(fatherModel:this, key:key, value:value));
+      });
+    }
+  }
+
+  static final keywords = [
+    {
+      "name": "__name__",
+      "set": (Model m, dynamic val) => m.jsonName = (val as String).trim(),
+    },
+    {
+      "name": "__url__",
+      "set": (Model m, dynamic val) => m.url = val,
+    },
+    {
+      "name": "__http__",
+      "set": (Model m, dynamic val) => m.httpMethods = HttpMethods(m, val),
+    },
+  ];
+
+  final JsonSerialize jsonSerialize;
+  String jsonName;
+  late final String modelTypeName;
+  String? url;
+  HttpMethods? httpMethods;
+  List<Member> members = [];
+  JsonType jsonType = JsonType.Map;
+
+  String get httpMethodsStr => httpMethods != null ? httpMethods!.methods.join("\n") : "";
+
+  Member get primaryMember {
+    final fund = members.firstWhereOrNull((e) => e.isPrimaryKey);
+    if(fund == null)
+      throw(StateError("*** ERROR: $jsonName does not have a primary key with @pk."));
+    return fund;
+  }
+
+  String get urlGetter {
+    if(url == null) return "";
+    return
+"""  @override
+  String get url => "$url";
+""";
+  }
+
+  String get pkSetter {
+    if(url == null) return "";
+    return
+"""  @override
+  set pk(primarykey) => ${primaryMember.name} = primarykey;
+""";
+  }
+
+  String get pkGetter {
+    if(url == null) return "";
+    return
+"""  @override
+  get pk => ${primaryMember.name};
+""";
+  }
+
+  List<Member> get ordinaryMembers => members.where((m) => m.isSlaveForeign == false).toList();
+  List<Member> get foreignSlaveMembers => members.where((m) => m.isSlaveForeign).toList();
+
+  String get fromJsonMembers {
+    var fromJsons = ordinaryMembers.map((e) => e.fromJson).toList();
+    if(foreignSlaveMembers.isNotEmpty) {
+      fromJsons.add('if(!slave) return this');
+      fromJsons.addAll(foreignSlaveMembers.map((e) => e.fromJson).toList());
+    }
+    return fromJsons.where((e) => e != null).join(';\n    ');
+  }
+  String get fromJson =>
+"""  $modelTypeName fromJson(${_jsonType(jsonType)}? json, {bool slave = true}) {
+    if(json == null) return this;
+    $fromJsonMembers;
+    return this;
+  }
+""";
+
+  String get toJsonMembers => members.map((e) => e.toJson).toList().where((e) => e != null).join('\n    ');
+  String get toJson =>
+    jsonType == JsonType.Map ?
+"""  Map<String, dynamic> toJson() => <String, dynamic>{
+    $toJsonMembers
+  }..removeWhere((k, v) => v==null);
+""" :
+"""
+  List toJson() =>
+    $toJsonMembers
+""";
+
+  String get fromMembers => members.map((e) => e.from).where((e) => e.isNotEmpty).toList().join("\n    ");
+  String get from =>
+"""  $modelTypeName from($modelTypeName instance) {
+    $fromMembers
+    return this;
+  }
+""";
+
+  String get addToFormDataOfMembers => members.map((e) => e.addToFormData).where((e) => e != null).toList().join('\n    ');
+  String get removeMtpFiles => members.map((e) => e.removeMtpFile).where((e) => e != null).toList().join('\n      ');
+  bool get hasFileType => members.where((e) => e.isFileType).isNotEmpty;
+  String get uploadFile => hasFileType ?
+"""
+  Future<bool> uploadFile() async {
+    var jsonObj = {'${primaryMember.name}': ${primaryMember.name}};
+    var formData = FormData.fromMap(jsonObj, ListFormat.multi);
+    $addToFormDataOfMembers
+    bool ret = true;
+    if(formData.files.isNotEmpty) {
+      ret = await update(data:formData);
+      $removeMtpFiles
+    }
+    return ret;
+  }
+""" : "";
+
+  String get imports {
+    var imports = members.map((e) => e.importModels).toSet();
+    if(url != null) {
+      imports.add("import \'model.dart\';");
+    }
+    if(httpMethods != null) {
+      imports.add("import \'package:dio/dio.dart\' as dio;");
+      imports.add("import \'${jsonSerialize.config["http_file"]}\';");
+    }
+    //if(queryset != null) array.add(queryset.import);
+    return imports.where((e) => e.isNotEmpty) .join("\n");
+  }
+
+  String get classMembers {
+    var array = members.map((e) => e.member).toList();
+    //if(filter != null) array.add('${filter.filterClassName} filter = ${filter.filterClassName}();');
+    //if(queryset != null) array.add('${queryset.querySetClassName} queryset = ${queryset.querySetClassName}();');
+    return "  " + array.join("\n  ");
+  }
+
+  String get filterClass => "";
+  /*
+  String get filterClass {
+    if(filter == null) return '';
+    var filterMember = members.where((e) => e.isSerializerType && e.typeSerializer.filter != null
+                                            && e.typeSerializer.filter.filterClassName == filter.filterClassName);
+    if(filterMember.isNotEmpty) return '';
+    return filter.filterClass;
+  }*/
+
+  String get extendsModel => url != null ? " extends Model" : "";
+  String get overrideFlag => url != null ? "  @override\n" : "";
+
+  String get content {
+    final List<String> body = [];
+    body.add("// **************************************************************************\n");
+    body.add("// GENERATED CODE BY jsonse - DO NOT MODIFY BY HAND\n");
+    body.add("// **************************************************************************\n");
+    body.add(imports);
+    body.add("\n\n");
+    body.add("class $modelTypeName$extendsModel {\n");
+    body.add("\n");
+    body.add(classMembers);
+    body.add("\n\n");
+    body.add(urlGetter);
+    body.add("\n");
+    body.add(pkGetter);
+    body.add("\n");
+    body.add(pkSetter);
+    body.add("\n");
+    body.add("$overrideFlag$fromJson");
+    body.add("\n");
+    body.add("$overrideFlag$toJson");
+    body.add("\n");
+    body.add(from);
+    body.add("\n");
+    body.add(httpMethodsStr);
+    body.add("}");
+    return body.where((e) => e.isNotEmpty).join("");
+}
+
+  Future save(String dist) async {
+    //if(members.where((e) => e.isFileType).isNotEmpty) await SingleFileType().save(distPath);
+    //if(queryset != null) await queryset.save(distPath);
+    if (!path.basename(dist).endsWith(".dart")) 
+      dist = path.join(dist, "$jsonName.dart");
+    File(dist).openWrite().write(content);
+  }
+}

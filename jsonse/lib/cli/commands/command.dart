@@ -138,13 +138,12 @@ abstract class CLICommand {
       _argumentValues = results;
 
       await determineToolVersion();
-      print("--- 0");
+
       if (showVersion) {
-         print("--- 0.1");
         outputSink.writeln("Jsonss CLI version: $toolVersion");
         return 0;
       }
-      print("--- 1");
+
       if (!isMachineOutput) {
         displayInfo("Jsonss CLI Version: $toolVersion");
       }

@@ -1,126 +1,75 @@
+import 'package:jsonse/model.dart';
+
 class HttpMethods {
-  final JsonSerializer fatherSerializer;
-  List methodsConfig = [];
-  Map<String, dynamic> httpConfig;
-  static const Map<String, String> methodMap = {
-    'create': 'post',
-    'update': 'put',
-    'retrieve': 'get',
-    'list': 'get',
-    'delete': 'delete',
-  };
 
-  String get baseUrl => httpConfig['url'];
-  String get httpPackage => httpConfig['http_package'];
-  String get importHttpPackage => httpPackage != null ? 'import \'$httpPackage\';' : null;
-  String get serializerType => fatherSerializer.serializerTypeName;
-  bool get hasSave => methodsConfig.indexWhere((e) => e['name'] == 'save') != -1;
-  bool get hasUpdate => methodsConfig.indexWhere((e) => e['name'] == 'update') != -1;
-  bool get hasDelete => methodsConfig.indexWhere((e) => e['name'] == 'delete') != -1;
-  String get uploadFile => fatherSerializer.hasFileType ? 'res = await uploadFile();' : null;
-  String get saveSync => fatherSerializer.membersSave.isNotEmpty ? 'if(res) {\n      ${fatherSerializer.membersSave}\n    }' : null;
-  HttpMethods(this.fatherSerializer, this.httpConfig) {
-    methodsConfig = httpConfig['methods'];
+  HttpMethods(this.fatherModel, this.https);
+
+  final List https;
+  final Model fatherModel;
+
+  List<String> get methods {
+    return https.map((e) {
+      final method = e as Map;
+      final methodName = method["name"];
+      final url = method["url"] ?? fatherModel.url;
+      final requestType = method["request"];
+      if(methodName == null || url == null || requestType == null) {
+        throw(StateError("*** ERROR: __http__ object lacks \'name\' or \'url\' or \'request\'."));
+      }
+      switch(requestType) {
+        case "post": return _post(methodName, url);
+        case "put": return _put(methodName, url);
+        case "get": return _get(methodName, url);
+        case "delete": return _delete(methodName, url);
+      }
+      return "";
+    }).where((e) => e.isNotEmpty).toList();
   }
 
-  String get attach {
-    var array = <String>[saveSync, uploadFile].where((e) => e != null).toList();
-    if(array.isEmpty) return '';
-
-    return '    ' + array.join('\n    ');
-  }
-
-  List<String> get methods =>
-    methodsConfig.map((e) {
-      List<String> query = [];
-      String queryset = '';
-      if(fatherSerializer.queryset != null) {
-          query.add('queries.addAll(queryset.queries);');
-      }
-      if(fatherSerializer.filter != null) {
-          query.add('queries.addAll(filter.queries);');
-      }
-      if(query.isNotEmpty) {
-        query.insert(0, 'if(queries == null) queries = <String, dynamic>{};');
-      }
-      if(query.isNotEmpty) {
-        queryset = query.join('\n    ') + '\n    ';
-      }
-
-      String methodName = e['name'];
-
-      if(methodName == 'save') {
-        String update = hasUpdate ? 'await update(data:data, queries:queries, cache:cache)' : '';
-        String create = 'await create(data:data, queries:queries, cache:cache)';
-        return
+  String _post(String name, String url) =>
 """
-  Future<bool> save({dynamic data, Map<String, dynamic> queries, bool cache=false}) async {
-    bool res = ${fatherSerializer.primaryMember.hidePrimaryMemberName} == null ?
-      $create :
-      $update;
-$attach
+  Future<dio.Response?> $name({List<String>? ignore, bool serialize = true}) async {
+    final jsonData = toJson();
+    if(ignore != null) {
+      jsonData.removeWhere((key, val) => ignore.contains(key));
+    }
+    var res = await Global.http.request("post", \"$url\", data: jsonData, queries: queries);
+    if(serialize) {
+      // Don't update slave forign members in create to avoid erasing newly added associated data
+      fromJson(res?.data, slave:false);
+    }
     return res;
   }
 """;
-      }
 
-      String requestUrl = baseUrl + (e["url"] != null ? e["url"] : '');
-      String requestType = e["requst"] != null ? e["requst"] : methodMap[methodName];
-      String data = 'data:data ?? toJson()';
-      String queries = 'queries:queries';
-      String cache = 'cache:cache';
+  String _put(String name, String url) =>
+"""
+  Future<dio.Response?> $name() async {
+    var res = Global.http.request("put", \"$url\", data: toJson(), queries: queries);
+    // Don't update slave forign members in create to avoid erasing newly added associated data
+    fromJson(res?.data, slave:false);
+    return res;
+  }
+""";
 
-      if(requestType == "post") {
-        return
+  String _get(String name, String url) =>
 """
-  Future<bool> $methodName({dynamic data, Map<String, dynamic> queries, bool cache=false}) async {
-    var res = await Http().request(HttpType.POST, '$requestUrl', $data, $queries, $cache);
-    fromJson(res?.data, slave:false); // Don't update slave forign members in create to avoid erasing newly added associated data
-    return res != null;
+  Future<dio.Response?> $name({bool getlist = false, bool serialize = true}) async {
+    var res = Global.http.request("get", \"$url\", queries: queries);
+    if(serialize) {
+      fromJson(res?.data);
+    }
+    return res;
   }
 """;
-      }
-      else if(requestType == "put") {
-        return
+
+  String _delete(String name, String url) =>
 """
-  Future<bool> $methodName({dynamic data, Map<String, dynamic> queries, bool cache=false}) async {
-    var res = await Http().request(HttpType.PUT, '$requestUrl', $data, $queries, $cache);
-    fromJson(res?.data, slave:false); // Don't update slave forign members in update to avoid erasing newly added associated data
-    return res != null;
-  }
-""";
-      }else if(methodName == "list") {
-        return
-"""
-  Future<List<$serializerType>> list({Map<String, dynamic> queries, bool cache=false}) async {
-    ${queryset}var res = await Http().request(HttpType.GET, '$requestUrl', $queries, $cache);
-    return res != null ? res.data.map<$serializerType>((e) => $serializerType().fromJson(e)).toList() : [];
-  }
-""";
-      }
-      else if(requestType == "get") {
-        return
-"""
-  Future<bool> $methodName({Map<String, dynamic> queries, bool cache=false}) async {
-    ${queryset}var res = await Http().request(HttpType.GET, '$requestUrl', $queries, $cache);
-    fromJson(res?.data);
-    return res != null;
-  }
-""";
-      }
-      else if(requestType == "delete") {
-        return
-"""
-  Future<bool> $methodName({${fatherSerializer.primaryMember.type} pk}) async {
-    if(${fatherSerializer.primaryMember.hidePrimaryMemberName} == null && pk == null) return true;
-    if(pk != null) ${fatherSerializer.primaryMember.name} = pk;
-    var res = await Http().request(HttpType.DELETE, '$requestUrl');
-    /*
-    ${fatherSerializer.membersDelete}
-    */
+  Future<dio.Response?> $name({String? primarykey}) async {
+    if(pk == null && primarykey == null) return true;
+    if(primarykey != null) pk = primarykey;
+    var res = await Global.http.request("delete", \"$url/\$pk\");
     return res != null ? res.statusCode == 204 : false;
   }
 """;
-      }
-    }).toList();
 }
