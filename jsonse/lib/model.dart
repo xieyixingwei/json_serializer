@@ -113,6 +113,7 @@ class Model {
   List<Member> get ordinaryMembers => members.where((m) => m.isSlaveForeign == false).toList();
   List<Member> get foreignSlaveMembers => members.where((m) => m.isSlaveForeign).toList();
 
+  String get pkShadowInFromJson => url != null ? "\n    pkShadow = pk;" : "";
   String get fromJsonMembers {
     var fromJsons = ordinaryMembers.map((e) => e.fromJson).toList();
     if(foreignSlaveMembers.isNotEmpty) {
@@ -124,7 +125,7 @@ class Model {
   String get fromJson =>
 """  $modelTypeName fromJson(${_jsonType(jsonType)}? json, {bool slave = true}) {
     if(json == null) return this;
-    $fromJsonMembers;
+    $fromJsonMembers;$pkShadowInFromJson
     return this;
   }
 """;
@@ -141,10 +142,12 @@ class Model {
     $toJsonMembers
 """;
 
+  String get pkShadowInFrom => url != null ? "\n    pkShadow = instance.pkShadow;" : "";
   String get fromMembers => members.map((e) => e.from).where((e) => e.isNotEmpty).toList().join("\n    ");
   String get from =>
-"""  $modelTypeName from($modelTypeName instance) {
-    $fromMembers
+"""  $modelTypeName from($modelTypeName? instance) {
+    if(instance == null) return this;
+    $fromMembers$pkShadowInFrom
     return this;
   }
 """;
@@ -176,26 +179,13 @@ class Model {
       imports.add("import \'package:dio/dio.dart\' as dio;");
       imports.add("import \'${jsonSerialize.config["http_file"]}\';");
     }
-    //if(queryset != null) array.add(queryset.import);
-    return imports.where((e) => e.isNotEmpty) .join("\n");
+    return imports.where((e) => e.isNotEmpty) .join("\n") + "\n";
   }
 
   String get classMembers {
     var array = members.map((e) => e.member).toList();
-    //if(filter != null) array.add('${filter.filterClassName} filter = ${filter.filterClassName}();');
-    //if(queryset != null) array.add('${queryset.querySetClassName} queryset = ${queryset.querySetClassName}();');
-    return "  " + array.join("\n  ");
+    return "  ${array.join("\n  ")}\n";
   }
-
-  String get filterClass => "";
-  /*
-  String get filterClass {
-    if(filter == null) return '';
-    var filterMember = members.where((e) => e.isSerializerType && e.typeSerializer.filter != null
-                                            && e.typeSerializer.filter.filterClassName == filter.filterClassName);
-    if(filterMember.isNotEmpty) return '';
-    return filter.filterClass;
-  }*/
 
   String get extendsModel => url != null ? " extends Model" : "";
   String get overrideFlag => url != null ? "  @override\n" : "";
@@ -206,31 +196,34 @@ class Model {
     body.add("// GENERATED CODE BY jsonse - DO NOT MODIFY BY HAND\n");
     body.add("// **************************************************************************\n");
     body.add(imports);
-    body.add("\n\n");
+    body.add("\n");
     body.add("class $modelTypeName$extendsModel {\n");
     body.add("\n");
     body.add(classMembers);
-    body.add("\n\n");
-    body.add(urlGetter);
     body.add("\n");
-    body.add(pkGetter);
-    body.add("\n");
-    body.add(pkSetter);
-    body.add("\n");
+    if(url != null) {
+      body.add(urlGetter);
+      body.add("\n");
+      body.add(pkGetter);
+      body.add("\n");
+      body.add(pkSetter);
+      body.add("\n");
+    }
     body.add("$overrideFlag$fromJson");
     body.add("\n");
     body.add("$overrideFlag$toJson");
     body.add("\n");
     body.add(from);
-    body.add("\n");
-    body.add(httpMethodsStr);
+    if(httpMethods != null) {
+      body.add("\n");
+      body.add(httpMethodsStr);
+    }
     body.add("}");
     return body.where((e) => e.isNotEmpty).join("");
 }
 
   Future save(String dist) async {
     //if(members.where((e) => e.isFileType).isNotEmpty) await SingleFileType().save(distPath);
-    //if(queryset != null) await queryset.save(distPath);
     if (!path.basename(dist).endsWith(".dart")) 
       dist = path.join(dist, "$jsonName.dart");
     File(dist).openWrite().write(content);

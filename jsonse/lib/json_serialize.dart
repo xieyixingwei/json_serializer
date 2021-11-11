@@ -2,16 +2,8 @@ library jsonse;
 
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:jsonse/model.dart';
 import 'package:path/path.dart' as path;
-/*
-
-void main(List<String> args) {
-  var js = JsonSerializeTool();
-  js.run(args);
-}
-*/
 
 class JsonSerialize {
 

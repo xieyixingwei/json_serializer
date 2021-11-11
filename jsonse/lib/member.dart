@@ -288,7 +288,8 @@ class Member {
     return isFileType ? "$name.from($from);" : "$name = $from;";
   }
 
-  String? get jsonEncode => (isForeign || isForeignManyToMany || notToJson) ? null : (isList || isMap ? 'jsonObj[\'$name\'] = json.encode(jsonObj[\'$name\']);' : null);
+  String? get jsonEncode => (isForeign || isForeignManyToMany || notToJson) 
+    ? null : (isList || isMap ? 'jsonObj[\'$name\'] = json.encode(jsonObj[\'$name\']);' : null);
   String? get addToFormData => isFileType ? 'if($name.mptFile != null) formData.files.add($name.file);' : null;
   String? get removeMtpFile => isFileType ? 'if($name.mptFile != null) $name.mptFile = null;' : null;
 }
