@@ -73,7 +73,7 @@ class Member {
     },
     {
       "name": "@pk",
-      "set": (Member m) => m.isPrimaryKey = true,
+      "set": (Member m) {m.isPrimaryKey = true; m.nullable = true; m.isNull = true;},
     },
     {
       "name": "@fk_mm",
