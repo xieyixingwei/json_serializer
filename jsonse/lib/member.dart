@@ -226,11 +226,12 @@ class Member {
   Model get typeModel {
     try{
       final found = fatherModel.jsonSerialize.models.singleWhereOrNull((e) => e.jsonName == modelTypeJsonName);
-      if (found != null)
-        throw(StateError("*** ERROR: can\'t find \"$modelTypeJsonName\" during build ${fatherModel.jsonName}."));
-      return found!;
+      if (found == null)
+        throw(StateError("*** ERROR: can\'t find \"$modelTypeJsonName\" during build \"${fatherModel.jsonName}\"."));
+      else
+        return found;
     } catch(e) {
-      throw(StateError("*** ERROR: find more than one \"$modelTypeJsonName\" during build ${fatherModel.jsonName}."));
+      throw(StateError("*** ERROR: find more than one \"$modelTypeJsonName\" during build \"${fatherModel.jsonName}\"."));
     }
   }
 
@@ -283,7 +284,7 @@ class Member {
     final checknull = nullable ? "$other == null ? null : " : "";
     final listFrom = "${checknull}List.from($other$unnullFlag)";
     final modelFrom = "$unListType().from($other)";
-    final listModelFrom = "List.from(instance.$name.map((e) => $unListType().from(e)).toList())";
+    final listModelFrom = "${checknull}List.from(instance.$name$unnullFlag.map((e) => $unListType().from(e)).toList())";
     final from = isList ? (isModelType ? listModelFrom : listFrom) : (isModelType ? modelFrom : other);
     return isFileType ? "$name.from($from);" : "$name = $from;";
   }
