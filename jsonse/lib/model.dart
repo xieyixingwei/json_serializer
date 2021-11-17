@@ -110,16 +110,36 @@ class Model {
 """;
   }
 
-  List<Member> get ordinaryMembers => members.where((m) => m.isSlaveForeign == false).toList();
-  List<Member> get foreignSlaveMembers => members.where((m) => m.isSlaveForeign).toList();
+  List<String?> get saves => members.map((e) => e.saves).where((e) => e != null).toList();
+  String get savesGetter {
+    return saves.isEmpty ? "" :
+"""  @override
+  List<List<Model?>> get saves => [${saves.join(",")}];
+""";
+  }
+
+  List<String?> get loads => members.map((e) => e.loads).where((e) => e != null).toList();
+  String get loadsGetter {
+    return loads.isEmpty ? "" :
+"""  @override
+  List<List<Model?>> get loads => [${loads.join(",")}];
+""";
+  }
+
+  List<String?> get foreigns => members.map((e) => e.foreign).where((e) => e != null).toList();
+  String get foreigSetter {
+    return foreigns.isEmpty ? "" :
+"""  @override
+  set foreign(dynamic _) {
+    ${foreigns.join("\n    ")}
+  }
+""";
+  }
 
   String get pkShadowInFromJson => url != null ? "\n    pkShadow = pk;" : "";
+
   String get fromJsonMembers {
-    var fromJsons = ordinaryMembers.map((e) => e.fromJson).toList();
-    if(foreignSlaveMembers.isNotEmpty) {
-      fromJsons.add('if(!slave) return this');
-      fromJsons.addAll(foreignSlaveMembers.map((e) => e.fromJson).toList());
-    }
+    var fromJsons = members.map((e) => e.fromJson).toList();
     return fromJsons.where((e) => e != null).join(';\n    ');
   }
   String get fromJson =>
@@ -208,6 +228,18 @@ class Model {
       body.add("\n");
       body.add(pkSetter);
       body.add("\n");
+      if(savesGetter.isNotEmpty) {
+        body.add(savesGetter);
+        body.add("\n");
+      }
+      if(loadsGetter.isNotEmpty) {
+        body.add(loadsGetter);
+        body.add("\n");
+      }
+      if(foreigSetter.isNotEmpty) {
+        body.add(foreigSetter);
+        body.add("\n");
+      }
     }
     body.add("$overrideFlag$fromJson");
     body.add("\n");
@@ -220,7 +252,7 @@ class Model {
     }
     body.add("}");
     return body.where((e) => e.isNotEmpty).join("");
-}
+  }
 
   Future save(String dist) async {
     //if(members.where((e) => e.isFileType).isNotEmpty) await SingleFileType().save(distPath);
