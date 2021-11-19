@@ -8,37 +8,25 @@ enum ForeignType {
   OneToOne
 }
 
-enum NestedType {
-  Non,
-  WriteRead,
-  OnlyRead
-}
-
-enum JsonType {
-  Map,
-  List
-}
-
 // 首字母大写
-String _capitalize(String str) => '${str[0].toUpperCase()}${str.substring(1)}';
+String _capitalize(String str) => "${str[0].toUpperCase()}${str.substring(1)}";
 
 String _reName(String name) {
   name = name.trim();
-  name = name.indexOf('_') > 0
-        ? name.split('_').map<String>((String e) => _capitalize(e)).toList().join('')
+  name = name.indexOf("_") > 0
+        ? name.split("_").map<String>((String e) => _capitalize(e)).toList().join("")
         : _capitalize(name);
   return name;
 }
 
-String toModelType(String name) => '${_reName(name)}Model';
+String toModelType(String name) => "${_reName(name)}Model";
 
 class Member {
 
   Member({
     required this.fatherModel,
     required String key,
-    required dynamic value,
-    this.jsonType = JsonType.Map}) {
+    required dynamic value}) {
 
     _parseKey(key.trim());
     _parseValue(value);
@@ -55,17 +43,16 @@ class Member {
   bool isList = false;
   bool isMap = false;
   ForeignType foreignType = ForeignType.Non;
-  JsonType jsonType;
   bool notFromJson = false;
   bool notToJson = false;
   bool isFileType =false;
-  NestedType nested = NestedType.Non;
   bool isSaveSync = false;
   bool nullable = false;
   bool isNull = false;
   bool isStatic = false;
   bool isForeign = false;
   bool isLoad = false;
+  bool isNested = false;
 
   static final keyDecorators = [
     {
@@ -100,7 +87,7 @@ class Member {
       "name": "@file",
       "set": (Member m) {
         m.isFileType = true;
-        m._unListType = 'SingleFile';
+        m._unListType = "SingleFile";
         m.init = "SingleFile();";
         m.notToJson = true;
       },
@@ -109,16 +96,12 @@ class Member {
       "name": "@dynamic",
       "set": (Member m) {
         m.init = null;
-        m._unListType = 'dynamic';
+        m._unListType = "dynamic";
       },
     },
     {
-      "name": "@nested_r",
-      "set": (Member m) => m.nested = NestedType.OnlyRead,
-    },
-    {
-      "name": "@nested", // must be after nested_r
-      "set": (Member m) => m.nested = NestedType.WriteRead,
+      "name": "@nested",
+      "set": (Member m) => m.isNested = true,
     },
   ];
 
@@ -132,13 +115,13 @@ class Member {
       }
     });
 
-    if (key.startsWith('___')) {
+    if (key.startsWith("___")) {
       notFromJson = true; // the member is not in fromJson
       notToJson = true; // the member is not in toJson
     }
-    else if (key.startsWith('__'))
+    else if (key.startsWith("__"))
       notFromJson = true;
-    else if (key.startsWith('_'))
+    else if (key.startsWith("_"))
       notToJson = true;
 
     name = _trim(key);
@@ -169,19 +152,19 @@ class Member {
       }
     }
     else if(value is Map) {
-      _unListType = 'Map<String, dynamic>';
-      init = '{}';
+      _unListType = "Map<String, dynamic>";
+      init = "{}";
       isMap = true;
     }
     else if(value is List) {
       isList = true;
       if(value.length == 0) {
-        _unListType = 'dynamic';
-        init = '[]';
+        _unListType = "dynamic";
+        init = "[]";
       }
       else {
         _parseValue(value.first);
-        init = init != null ? '[]' : null;
+        init = init != null ? "[]" : null;
       }
     }
 
@@ -190,7 +173,7 @@ class Member {
   }
 
   String get unListType {
-    if(nested != NestedType.Non)
+    if(isNested)
       return _unListType;
     // the type of foreign member is the type of foreign to Model's primary key
     if(fatherModel.jsonSerialize.config["foreign_type"] == "pk" && isForeign)
@@ -198,13 +181,13 @@ class Member {
     return _unListType;
   }
 
-  String get type => isList ? 'List<$unListType>' : unListType;
-  bool get isModelType => type.contains('Model');
+  String get type => isList ? "List<$unListType>" : unListType;
+  bool get isModelType => type.contains("Model");
 
   // the type of foreign member is not a Serializer and don't need import serializer
   String get importModels {
     List<String> import = [];
-    //if(nested == NestedType.Non) return "";
+    //if(!isNested) return "";
     if(isModelType && fatherModel.modelTypeName != _unListType) import.add("import \'$modelTypeJsonName.dart\';");
     //if(isFileType) import.add(SingleFileType.import);
     return import.join("\n");
@@ -228,7 +211,7 @@ class Member {
     final value = init != null ? " = $init" : "";
     final nullableFlag = nullable ? "?" : "";
     final staticFlag = isStatic ? "static " : "";
-    return '$staticFlag$type$nullableFlag $name$value;';
+    return "$staticFlag$type$nullableFlag $name$value;";
   }
 
   String? get saves => isSaveSync ? (isList ? name : "[$name]"): null;
@@ -239,16 +222,16 @@ class Member {
     !isForeign ? null : "if(_ is $unListType) { $name = _; return; }";
 
   String? get fromJson {
-    // ignore member which name start with '__'
+    // ignore member which name start with "__"
     if(notFromJson) return null;
-    final jsonMember = jsonType == JsonType.Map ? 'json[\'$name\']' : 'json';
-    final type = isFileType ? 'String' : unListType;
-    final eFromJson = isModelType ? '$type().fromJson(e as Map<String, dynamic>)' : 'e as $type';
-    final memberName = isFileType ? '$name.url' : name;
+    final jsonMember = "json[\"$name\"]";
+    final type = isFileType ? "String" : unListType;
+    final eFromJson = isModelType ? "$type().fromJson(e as Map<String, dynamic>)" : "e as $type";
+    final memberName = isFileType ? "$name.url" : name;
     final unListFromJson = isModelType ? 
 """$jsonMember == null
                 ? $memberName
-                : $unListType().fromJson($jsonMember as Map<String, dynamic>)""" : '$jsonMember == null ? $memberName : $jsonMember as $type';
+                : $unListType().fromJson($jsonMember as Map<String, dynamic>)""" : "$jsonMember == null ? $memberName : $jsonMember as $type";
 
     final listFromJson = 
 """$jsonMember == null
@@ -256,21 +239,21 @@ class Member {
                 : $jsonMember.map<$unListType>((e) => $eFromJson).toList()""";
 
     final memberFromJson = isList ? listFromJson : unListFromJson;
-    return '$memberName = $memberFromJson';
+    return "$memberName = $memberFromJson";
   }
 
   String? get toJson {
-    if(notToJson) return null; // ignore member which name start with '_'
+    if(notToJson) return null; // ignore member which name start with "_"
     final checknull = nullable ? "?" : "";
     String eToJson = isModelType ? "e.toJson()" : "e";
     String unListToJson = isModelType ? "$name$checknull.toJson()" : "$name";
-    if(nested == NestedType.OnlyRead) {
+    if(isNested) {
       eToJson = "e.${typeModel.primaryMember.name}";
       unListToJson = "$name$checknull.${typeModel.primaryMember.name}";
     }
     final listToJson = "$name$checknull.map((e) => $eToJson).toList()";
     final memberToJson = isList ? listToJson : unListToJson;
-    return jsonType == JsonType.Map ? "\"$name\": $memberToJson," : "$memberToJson;";
+    return "\"$name\": $memberToJson,";
   }
 
   String get from {
@@ -279,14 +262,14 @@ class Member {
     final other = "instance.$name";
     final checknull = nullable ? "$other == null ? null : " : "";
     final listFrom = "${checknull}List.from($other$unnullFlag)";
-    final modelFrom = "$checknull$unListType().from($other)";
+    final modelFrom = "$checknull$unListType().from($other) as $unListType";
     final listModelFrom = "${checknull}List.from(instance.$name$unnullFlag.map((e) => $unListType().from(e)).toList())";
     final from = isList ? (isModelType ? listModelFrom : listFrom) : (isModelType ? modelFrom : other);
     return isFileType ? "$name.from($from);" : "$name = $from;";
   }
 
   String? get jsonEncode => (isForeign || notToJson) 
-    ? null : (isList || isMap ? 'jsonObj[\'$name\'] = json.encode(jsonObj[\'$name\']);' : null);
-  String? get addToFormData => isFileType ? 'if($name.mptFile != null) formData.files.add($name.file);' : null;
-  String? get removeMtpFile => isFileType ? 'if($name.mptFile != null) $name.mptFile = null;' : null;
+    ? null : (isList || isMap ? "jsonObj[\"$name\"] = json.encode(jsonObj[\"$name\"]);" : null);
+  String? get addToFormData => isFileType ? "if($name.mptFile != null) formData.files.add($name.file);" : null;
+  String? get removeMtpFile => isFileType ? "if($name.mptFile != null) $name.mptFile = null;" : null;
 }

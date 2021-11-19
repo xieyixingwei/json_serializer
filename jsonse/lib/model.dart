@@ -6,9 +6,6 @@ import 'package:path/path.dart' as path;
 import 'package:jsonse/member.dart';
 import 'package:jsonse/json_serialize.dart';
 
-String _jsonType(JsonType type) =>
-  type == JsonType.Map ? 'Map<String, dynamic>' : 'List';
-
 class Model {
 
   Model({
@@ -20,7 +17,7 @@ class Model {
     try{
       obj = json.decode(jsonSrc);
     } catch(e) {
-      print('*** ERROR: from \'${this.jsonName}.json\' parse Json Error: $e');
+      print("*** ERROR: from \"${this.jsonName}.json\" parse Json Error: $e");
       return;
     }
 
@@ -35,23 +32,9 @@ class Model {
 
     modelTypeName = toModelType(jsonName);
 
-    if(obj['__json__'] != null) {
-/*
-      Map<String, dynamic> jsonConfig = obj['__json__'];
-      obj.remove('__json__');
-
-      jsonType = jsonConfig['type'] is List ? JsonType.List : jsonType;
-
-      String key = jsonConfig['member'].keys.first;
-      dynamic value = jsonConfig['member'].values.first;
-      members.add(Member(key, value, this, serializeTool, jsonType: jsonType));
-*/
-    }
-    else {
-      obj.forEach((String key, dynamic value) {
-        members.add(Member(fatherModel:this, key:key, value:value));
-      });
-    }
+    obj.forEach((String key, dynamic value) {
+      members.add(Member(fatherModel:this, key:key, value:value));
+    });
   }
 
   static final keywords = [
@@ -75,7 +58,6 @@ class Model {
   String? url;
   HttpMethods? httpMethods;
   List<Member> members = [];
-  JsonType jsonType = JsonType.Map;
 
   String get httpMethodsStr => httpMethods != null ? httpMethods!.methods.join("\n") : "";
 
@@ -140,45 +122,42 @@ class Model {
 
   String get fromJsonMembers {
     var fromJsons = members.map((e) => e.fromJson).toList();
-    return fromJsons.where((e) => e != null).join(';\n    ');
+    return fromJsons.where((e) => e != null).join(";\n    ");
   }
   String get fromJson =>
-"""  $modelTypeName fromJson(${_jsonType(jsonType)}? json, {bool slave = true}) {
+"""  $modelTypeName fromJson(Map<String, dynamic>? json, {bool slave = true}) {
     if(json == null) return this;
     $fromJsonMembers;$pkShadowInFromJson
     return this;
   }
 """;
 
-  String get toJsonMembers => members.map((e) => e.toJson).toList().where((e) => e != null).join('\n    ');
+  String get toJsonMembers => members.map((e) => e.toJson).toList().where((e) => e != null).join("\n    ");
   String get toJson =>
-    jsonType == JsonType.Map ?
-"""  Map<String, dynamic> toJson() => <String, dynamic>{
+"""  Map<String, dynamic> toJson({List<String>? nulls}) => <String, dynamic>{
     $toJsonMembers
-  }..removeWhere((k, v) => v==null);
-""" :
-"""
-  List toJson() =>
-    $toJsonMembers
+  }..removeWhere((k, v) => (!(nulls?.contains(k) ?? false)) && (v == null));
 """;
 
   String get pkShadowInFrom => url != null ? "\n    pkShadow = instance.pkShadow;" : "";
   String get fromMembers => members.map((e) => e.from).where((e) => e.isNotEmpty).toList().join("\n    ");
+  String get fromType => url != null ? "Model" : modelTypeName;
+  String get asFromType => url != null ? "\n    instance as $modelTypeName?;" : "";
   String get from =>
-"""  $modelTypeName from($modelTypeName? instance) {
+"""  $fromType from($fromType? instance) {$asFromType
     if(instance == null) return this;
     $fromMembers$pkShadowInFrom
     return this;
   }
 """;
 
-  String get addToFormDataOfMembers => members.map((e) => e.addToFormData).where((e) => e != null).toList().join('\n    ');
-  String get removeMtpFiles => members.map((e) => e.removeMtpFile).where((e) => e != null).toList().join('\n      ');
+  String get addToFormDataOfMembers => members.map((e) => e.addToFormData).where((e) => e != null).toList().join("\n    ");
+  String get removeMtpFiles => members.map((e) => e.removeMtpFile).where((e) => e != null).toList().join("\n      ");
   bool get hasFileType => members.where((e) => e.isFileType).isNotEmpty;
   String get uploadFile => hasFileType ?
 """
   Future<bool> uploadFile() async {
-    var jsonObj = {'${primaryMember.name}': ${primaryMember.name}};
+    var jsonObj = {"${primaryMember.name}": ${primaryMember.name}};
     var formData = FormData.fromMap(jsonObj, ListFormat.multi);
     $addToFormDataOfMembers
     bool ret = true;
@@ -245,7 +224,7 @@ class Model {
     body.add("\n");
     body.add("$overrideFlag$toJson");
     body.add("\n");
-    body.add(from);
+    body.add("$overrideFlag$from");
     if(httpMethods != null) {
       body.add("\n");
       body.add(httpMethodsStr);

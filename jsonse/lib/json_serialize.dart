@@ -67,18 +67,18 @@ class JsonSerialize {
     String? left;
     String? right;
     int count = 0;
-    String one = '';
-    src.split('').forEach((e) {
-      if(left == null && '{['.contains(e)) {
+    String one = "";
+    src.split("").forEach((e) {
+      if(left == null && "{[".contains(e)) {
         left = e;
-        right = left == '{' ? '}' : ']';
+        right = left == "{" ? "}" : "]";
       }
       if(left != null && e == left) count++;
       if(right != null && e == right) count--;
       one += e;
       if(left != null && count == 0) {
         ret.add(one);
-        one = '';
+        one = "";
         left = null;
         right = null;
       }
@@ -87,14 +87,14 @@ class JsonSerialize {
   }
 
   String _removeComments(List<String> lines) {
-    String content = '';
+    String content = "";
     lines.forEach(
       (String line) {
-        int pos = line.indexOf('//'); // comment char is '//'
+        int pos = line.indexOf("//"); // comment char is "//"
         if(pos != -1) {
           line = line.substring(0, pos);
         }
-        content += line + '\n';
+        content += line + "\n";
       }
     );
     return content;
@@ -104,7 +104,7 @@ class JsonSerialize {
     try{
       config = json.decode(_removeComments(cf.readAsLinesSync()));
     } catch(e) {
-      print('*** ERROR: from \'$config\' parse Json Error: $e');
+      print("*** ERROR: from \"$config\" parse Json Error: $e");
     }
   }
 
@@ -122,7 +122,7 @@ class JsonSerialize {
         try {
           await e.save(output);
         } catch(error) {
-          print('*** Error: ${e.jsonName}.json');
+          print("*** Error: ${e.jsonName}.json");
           print(error);
         }
       } 
