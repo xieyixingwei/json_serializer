@@ -134,9 +134,9 @@ class Model {
 
   String get toJsonMembers => members.map((e) => e.toJson).toList().where((e) => e != null).join("\n    ");
   String get toJson =>
-"""  Map<String, dynamic> toJson({List<String>? nulls}) => <String, dynamic>{
+"""  Map<String, dynamic> toJson({List<String>? ignores, List<String>? nulls}) => <String, dynamic>{
     $toJsonMembers
-  }..removeWhere((k, v) => (!(nulls?.contains(k) ?? false)) && (v == null));
+  }..removeWhere((k, v) => (ignores?.contains(k) ?? false) || ((!(nulls?.contains(k) ?? false)) && (v == null)));
 """;
 
   String get pkShadowInFrom => url != null ? "\n    pkShadow = instance.pkShadow;" : "";

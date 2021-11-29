@@ -51,6 +51,7 @@ class Member {
   bool isNull = false;
   bool isStatic = false;
   bool isForeign = false;
+  bool isSlave = false;
   bool isLoad = false;
   bool isNested = false;
 
@@ -66,6 +67,10 @@ class Member {
     {
       "name": "@foreign",
       "set": (Member m) {m.isForeign = true; m.nullable = true; m.isNull = true;},
+    },
+    {
+      "name": "@slave",
+      "set": (Member m) {m.isSlave = true;},
     },
     {
       "name": "@save",
