@@ -219,9 +219,9 @@ class Member {
     return "$staticFlag$type$nullableFlag $name$value;";
   }
 
-  String? get saves => isSaveSync ? (isList ? name : "[$name]"): null;
+  String? get saves => isSaveSync ? name : null;
 
-  String? get loads => isLoad ? (isList ? name : "[$name]"): null;
+  String? get loads => isLoad ? name : null;
 
   String? get foreign =>
     !isForeign ? null : "if(_ is $unListType) { $name = _; return; }";

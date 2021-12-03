@@ -96,7 +96,7 @@ class Model {
   String get savesGetter {
     return saves.isEmpty ? "" :
 """  @override
-  List<List<Model?>> get saves => [${saves.join(",")}];
+  List<dynamic> get saves => [${saves.join(",")}];
 """;
   }
 
@@ -104,7 +104,7 @@ class Model {
   String get loadsGetter {
     return loads.isEmpty ? "" :
 """  @override
-  List<List<Model?>> get loads => [${loads.join(",")}];
+  List<dynamic> get loads => [${loads.join(",")}];
 """;
   }
 
