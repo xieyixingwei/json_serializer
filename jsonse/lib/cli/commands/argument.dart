@@ -1,8 +1,8 @@
-import 'package:args/args.dart' as args;
+import 'package:args/args.dart';
 
 abstract class Argument {
 
-  void addToParser(args.ArgParser parser);
+  void addToParser(ArgParser parser);
 }
 
 class Flag implements Argument {
@@ -22,8 +22,9 @@ class Flag implements Argument {
   final bool hide;
 
   @override
-  void addToParser(args.ArgParser parser) =>
-    parser.addFlag(name,
+  void addToParser(ArgParser parser) =>
+    parser.addFlag(
+      name,
       abbr: abbr,
       help: help,
       defaultsTo: defaultsTo,
@@ -33,13 +34,15 @@ class Flag implements Argument {
 
 class Option implements Argument {
 
-  const Option(this.name, {this.abbr,
-      this.help,
-      this.valueHelp,
-      this.allowed,
-      this.allowedHelp,
-      this.defaultsTo,
-      this.hide = false});
+  const Option(
+    this.name, {
+    this.abbr,
+    this.help,
+    this.valueHelp,
+    this.allowed,
+    this.allowedHelp,
+    this.defaultsTo,
+    this.hide = false});
 
   final String name;
   final String? abbr;
@@ -51,8 +54,9 @@ class Option implements Argument {
   final bool hide;
 
   @override
-  void addToParser(args.ArgParser parser) =>
-    parser.addOption(name,
+  void addToParser(ArgParser parser) =>
+    parser.addOption(
+      name,
       abbr: abbr,
       help: help,
       valueHelp: valueHelp,

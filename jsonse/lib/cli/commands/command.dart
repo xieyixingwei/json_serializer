@@ -2,14 +2,14 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:mirrors';
 import 'dart:isolate';
-import 'package:args/args.dart' as args;
+import 'package:args/args.dart';
 import 'package:yaml/yaml.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:collection/collection.dart';
 import 'package:runtime/runtime.dart' as runtime;
-import 'package:jsonse/cli/commands/metadata.dart';
+import 'argument.dart';
 import 'package:jsonse/cli/commands/running_process.dart';
-import 'package:jsonse/utilities/mirror_helpers.dart' as mirrorhelpers;
+import 'package:jsonse/utils/mirror_helpers.dart' as mirrorhelpers;
 
 /// Exceptions thrown by command line interfaces.
 class CLIException implements Exception {
@@ -24,32 +24,30 @@ class CLIException implements Exception {
 
 enum CLIColor { red, green, blue, boldRed, boldGreen, boldBlue, boldNone, none }
 
-abstract class CLICommand {
+abstract class Command {
 
-  CLICommand() {
-    final arguments = reflect(this).type.instanceMembers.values.where((m) =>
-        m.metadata.any((im) => im.type.isAssignableTo(reflectType(Argument))));
+  Command() {
+    final arguments = mirrorhelpers.getMetaMembersOfInstance<Argument>(this);
 
     arguments.forEach((arg) {
       if (!arg.isGetter) {
         throw StateError("Declaration "
             "${MirrorSystem.getName(arg.owner!.simpleName)}.${MirrorSystem.getName(arg.simpleName)} "
-            "has CLI annotation, but is not a getter.");
+            "has Argument annotation, but is not a getter.");
       }
 
-      final Argument argType = mirrorhelpers.firstMetadataOfTypeA(arg);
-      argType.addToParser(options);
+      final argType = mirrorhelpers.firstMetadata<Argument>(arg);
+      argType.addToParser(args);
     });
   }
 
-  /// Options for this command.
-  args.ArgParser options = args.ArgParser(allowTrailingOptions: true);
+  final args = ArgParser(allowTrailingOptions: true);
 
-  args.ArgResults? _argumentValues;
+  ArgResults? _argumentValues;
 
   List<String>? get remainingArguments => _argumentValues?.rest;
 
-  args.ArgResults? get command => _argumentValues?.command;
+  ArgResults? get command => _argumentValues?.command;
 
   StoppableProcess? get runningProcess {
     return _commandMap.values
@@ -75,7 +73,7 @@ abstract class CLICommand {
       defaultsTo: false)
   bool get isMachineOutput => decode("machine");
 
-  final Map<String, CLICommand> _commandMap = {};
+  final Map<String, Command> _commandMap = {};
 
   StringSink _outputSink = stdout;
 
@@ -103,9 +101,9 @@ abstract class CLICommand {
     return runtime.RuntimeContext.current.coerce(val);
   }
 
-  void registerCommand(CLICommand cmd) {
+  void registerCommand(Command cmd) {
     _commandMap[cmd.name] = cmd;
-    options.addCommand(cmd.name, cmd.options);
+    args.addCommand(cmd.name, cmd.args);
   }
 
   /// Handles the command input.
@@ -124,7 +122,7 @@ abstract class CLICommand {
   ///
   /// Do not override this method. This method invokes [handle] within a try-catch block
   /// and will invoke [cleanup] when complete.
-  Future<int> process(args.ArgResults results,
+  Future<int> process(ArgResults results,
       {List<String>? commandPath}) async {
     final parentCommandNames = commandPath ?? <String>[];
     print("--- process ${results.command}");
@@ -198,7 +196,7 @@ abstract class CLICommand {
     outputSink.writeln(
         "${colorSymbol(color)}$_errorDelimiter$errorMessage$defaultColorSymbol");
     if (showUsage) {
-      outputSink.writeln("\n${options.usage}");
+      outputSink.writeln("\n${args.usage}");
     }
   }
 
@@ -264,12 +262,12 @@ abstract class CLICommand {
     }
     print("");
     print("Options:");
-    print("${options.usage}");
+    print("${args.usage}");
 
-    if (options.commands.isNotEmpty) {
+    if (args.commands.isNotEmpty) {
       print("Available sub-commands:");
 
-      var commandNames = options.commands.keys.toList();
+      var commandNames = args.commands.keys.toList();
       commandNames.sort((a, b) => b.length.compareTo(a.length));
       var length = commandNames.first.length + 3;
       commandNames.forEach((command) {

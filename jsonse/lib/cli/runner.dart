@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:jsonse/cli/commands/command.dart';
 import 'package:jsonse/cli/commands/jsonse.dart';
 
-class Runner extends CLICommand {
+class Runner extends Command {
   Runner() {
-    registerCommand(CLIjsonse());
+    registerCommand(JsonseCommand());
   }
 
   @override

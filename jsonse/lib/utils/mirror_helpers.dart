@@ -10,7 +10,7 @@ Iterable<ClassMirror> classHierarchyForClass(ClassMirror t) sync* {
   }
 }
 
-T firstMetadataOfTypeA<T>(DeclarationMirror dm, {TypeMirror? dynamicType}) {
+T firstMetadata<T>(DeclarationMirror dm, {TypeMirror? dynamicType}) {
   final tMirror = dynamicType ?? reflectType(T);
   final find = dm.metadata.firstWhereOrNull((im) => im.type.isSubtypeOf(tMirror));
   return find?.reflectee as T;
@@ -31,3 +31,7 @@ String? getMethodAndClassName(VariableMirror mirror) {
 
   return "${MirrorSystem.getName(mirror.owner!.owner!.simpleName)}.${MirrorSystem.getName(mirror.owner!.simpleName)}";
 }
+
+Iterable<MethodMirror> getMetaMembersOfInstance<T>(dynamic instance) =>
+  reflect(instance).type.instanceMembers.values.where((m) =>
+    m.metadata.any((im) => im.type.isAssignableTo(reflectType(T))));

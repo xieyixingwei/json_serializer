@@ -1,8 +1,8 @@
 import 'package:jsonse/cli/commands/command.dart';
-import 'package:jsonse/cli/commands/metadata.dart';
+import 'argument.dart';
 import 'package:jsonse/json_serialize.dart';
 
-class CLIjsonse extends CLICommand {
+class JsonseCommand extends Command {
   @Option("in",
     abbr: "i",
     help: "The directory/file name to store json object",

@@ -54,6 +54,7 @@ class Member {
   bool isSlave = false;
   bool isLoad = false;
   bool isNested = false;
+  bool isDateTime = false;
 
   static final keyDecorators = [
     {
@@ -111,14 +112,6 @@ class Member {
   ];
 
   void _parseKey(String key) {
-    keyDecorators.forEach((e) {
-      final name = e["name"] as String;
-      final set = e["set"] as Function(Member);
-      if (key.contains(name)) {
-        key = key.replaceAll(name, "").trim();
-        set(this);
-      }
-    });
 
     if (key.startsWith("___")) {
       notFromJson = true; // the member is not in fromJson
@@ -128,6 +121,17 @@ class Member {
       notFromJson = true;
     else if (key.startsWith("_"))
       notToJson = true;
+
+    keyDecorators.forEach((e) {
+      final name = e["name"] as String;
+      final set = e["set"] as Function(Member);
+      if (key.contains(name)) {
+        key = key.replaceAll(name, "").trim();
+        set(this);
+      }
+    });
+
+
 
     name = _trim(key);
   }
@@ -150,6 +154,13 @@ class Member {
         modelTypeJsonName = value.substring(1).trim();
         _unListType = toModelType(modelTypeJsonName!);
         init = "$_unListType()";
+      }
+      else if(value.trim().startsWith("DateTime")) {
+        isDateTime = true;
+        _unListType = "DateTime";
+        final v = value.trim().replaceFirst("DateTime", "").trim();
+        if(v.isNotEmpty)
+        init = "$value";
       }
       else {
         _unListType = "String";
@@ -233,6 +244,9 @@ class Member {
     final type = isFileType ? "String" : unListType;
     final eFromJson = isModelType ? "$type().fromJson(e as Map<String, dynamic>)" : "e as $type";
     final memberName = isFileType ? "$name.url" : name;
+    if(isDateTime) {
+      return "$memberName = $jsonMember == null ? $memberName : DateTime.parse($jsonMember).toLocal()";
+    }
     final unListFromJson = isModelType ? 
 """$jsonMember == null
                 ? $memberName
@@ -256,6 +270,9 @@ class Member {
       eToJson = "e.${typeModel.primaryMember.name}";
       unListToJson = "$name$checknull.${typeModel.primaryMember.name}";
     }
+    if(isDateTime) {
+      return "\"$name\": $name$checknull.toString(),";
+    }
     final listToJson = "$name$checknull.map((e) => $eToJson).toList()";
     final memberToJson = isList ? listToJson : unListToJson;
     return "\"$name\": $memberToJson,";
@@ -270,6 +287,12 @@ class Member {
     final modelFrom = "$checknull$unListType().from($other) as $unListType";
     final listModelFrom = "${checknull}List.from(instance.$name$unnullFlag.map((e) => $unListType().from(e)).toList())";
     final from = isList ? (isModelType ? listModelFrom : listFrom) : (isModelType ? modelFrom : other);
+    if(isDateTime) {
+      if(nullable)
+        return "$name = instance.$name == null ? null : DateTime.parse(instance.$name.toString());";
+      else
+        return "$name = DateTime.parse(instance.$name.toString());";
+    }
     return isFileType ? "$name.from($from);" : "$name = $from;";
   }
 
