@@ -80,7 +80,7 @@ class Model {
     if(url == null) return "";
     return
 """  @override
-  set pk(primarykey) => ${primaryMember.name} = primarykey;
+  set pk(primarykey) => ${primaryMember.name}.value = primarykey;
 """;
   }
 
@@ -88,67 +88,48 @@ class Model {
     if(url == null) return "";
     return
 """  @override
-  get pk => ${primaryMember.name};
+  get pk => ${primaryMember.name}.value;
 """;
   }
 
-  List<String?> get saves => members.map((e) => e.saves).where((e) => e != null).toList();
-  String get savesGetter {
-    return saves.isEmpty ? "" :
-"""  @override
-  List<dynamic> get saves => [${saves.join(",")}];
-""";
-  }
-
-  List<String?> get loads => members.map((e) => e.loads).where((e) => e != null).toList();
-  String get loadsGetter {
-    return loads.isEmpty ? "" :
-"""  @override
-  List<dynamic> get loads => [${loads.join(",")}];
-""";
-  }
-
-  List<String?> get foreigns => members.map((e) => e.foreign).where((e) => e != null).toList();
-  String get foreigSetter {
-    return foreigns.isEmpty ? "" :
-"""  @override
-  set foreign(dynamic _) {
-    ${foreigns.join("\n    ")}
+  String get toJsonMembers =>
+    members.map((e) => e.toJson).where((e) => e != null).join("\n    ");
+  String get toJson =>
+"""  Map<String, dynamic> toJson({List<String>? ignores, List<String>? nulls}) {
+    var ret = <String, dynamic>{};
+    $toJsonMembers
+    ret.removeWhere((k, v) => (ignores?.contains(k) ?? false) || ((!(nulls?.contains(k) ?? false)) && (v == null)));
+    return ret;
   }
 """;
-  }
 
-  String get pkShadowInFromJson => url != null ? "\n    pkShadow = pk;" : "";
-
-  String get fromJsonMembers {
-    var fromJsons = members.map((e) => e.fromJson).toList();
-    return fromJsons.where((e) => e != null).join(";\n    ");
-  }
+  String get fromJsonMembers =>
+    members.map((e) => e.fromJson).where((e) => e != null).join("\n    ");
   String get fromJson =>
 """  $modelTypeName fromJson(Map<String, dynamic>? json, {bool slave = true}) {
     if(json == null) return this;
-    $fromJsonMembers;$pkShadowInFromJson
+    $fromJsonMembers
     return this;
   }
 """;
 
-  String get toJsonMembers => members.map((e) => e.toJson).toList().where((e) => e != null).join("\n    ");
-  String get toJson =>
-"""  Map<String, dynamic> toJson({List<String>? ignores, List<String>? nulls}) => <String, dynamic>{
-    $toJsonMembers
-  }..removeWhere((k, v) => (ignores?.contains(k) ?? false) || ((!(nulls?.contains(k) ?? false)) && (v == null)));
-""";
-
-  String get pkShadowInFrom => url != null ? "\n    pkShadow = instance.pkShadow;" : "";
-  String get fromMembers => members.map((e) => e.from).where((e) => e.isNotEmpty).toList().join("\n    ");
+  String get fromMembers => members.map((e) => e.from).where((e) => e.isNotEmpty).join("\n    ");
   String get fromType => url != null ? "Model" : modelTypeName;
   String get asFromType => url != null ? "\n    instance as $modelTypeName?;" : "";
   String get from =>
 """  $fromType from($fromType? instance) {$asFromType
     if(instance == null) return this;
-    $fromMembers$pkShadowInFrom
+    $fromMembers
     return this;
   }
+""";
+
+  String get editWidgetsMembers =>
+    members.map((e) => e.editWidget).where((e) => e != null).join("\n    ");
+  String get editWidgets =>
+"""  List<Widget> editWidgets({Function()? update}) => [
+    $editWidgetsMembers
+  ];
 """;
 
   String get addToFormDataOfMembers => members.map((e) => e.addToFormData).where((e) => e != null).toList().join("\n    ");
@@ -171,13 +152,15 @@ class Model {
 
   String get imports {
     var imports = members.map((e) => e.importModels).toSet();
-    if(url != null) {
-      imports.add("import \'model.dart\';");
-    }
     if(httpMethods != null) {
       imports.add("import \'package:dio/dio.dart\' as dio;");
       imports.add("import \'${jsonSerialize.config["http_file"]}\';");
     }
+    imports.add("import \'package:flutter/material.dart\';");
+    if(url != null) {
+      imports.add("import \'common/model.dart\';");
+    }
+    imports.add("import \'common/member.dart\';");
     return imports.where((e) => e.isNotEmpty) .join("\n") + "\n";
   }
 
@@ -200,6 +183,7 @@ class Model {
     body.add("\n");
     body.add(classMembers);
     body.add("\n");
+
     if(url != null) {
       body.add(urlGetter);
       body.add("\n");
@@ -207,24 +191,16 @@ class Model {
       body.add("\n");
       body.add(pkSetter);
       body.add("\n");
-      if(savesGetter.isNotEmpty) {
-        body.add(savesGetter);
-        body.add("\n");
-      }
-      if(loadsGetter.isNotEmpty) {
-        body.add(loadsGetter);
-        body.add("\n");
-      }
-      if(foreigSetter.isNotEmpty) {
-        body.add(foreigSetter);
-        body.add("\n");
-      }
     }
+
     body.add("$overrideFlag$fromJson");
     body.add("\n");
     body.add("$overrideFlag$toJson");
     body.add("\n");
     body.add("$overrideFlag$from");
+    body.add("\n");
+    body.add("$overrideFlag$editWidgets");
+
     if(httpMethods != null) {
       body.add("\n");
       body.add(httpMethodsStr);
