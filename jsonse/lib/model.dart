@@ -106,7 +106,7 @@ class Model {
   String get fromJsonMembers =>
     members.map((e) => e.fromJson).where((e) => e != null).join("\n    ");
   String get fromJson =>
-"""  $modelTypeName fromJson(Map<String, dynamic>? json, {bool slave = true}) {
+"""  $modelTypeName fromJson(Map<String, dynamic>? json) {
     if(json == null) return this;
     $fromJsonMembers
     return this;
@@ -114,8 +114,8 @@ class Model {
 """;
 
   String get fromMembers => members.map((e) => e.from).where((e) => e.isNotEmpty).join("\n    ");
-  String get fromType => url != null ? "Model" : modelTypeName;
-  String get asFromType => url != null ? "\n    instance as $modelTypeName?;" : "";
+  String get fromType => "Model";
+  String get asFromType => "\n    instance as $modelTypeName?;";
   String get from =>
 """  $fromType from($fromType? instance) {$asFromType
     if(instance == null) return this;
@@ -157,9 +157,7 @@ class Model {
       imports.add("import \'${jsonSerialize.config["http_file"]}\';");
     }
     imports.add("import \'package:flutter/material.dart\';");
-    if(url != null) {
-      imports.add("import \'common/model.dart\';");
-    }
+    imports.add("import \'common/model.dart\';");
     imports.add("import \'common/member.dart\';");
     return imports.where((e) => e.isNotEmpty) .join("\n") + "\n";
   }
@@ -169,8 +167,8 @@ class Model {
     return "  ${array.join("\n  ")}\n";
   }
 
-  String get extendsModel => url != null ? " extends Model" : "";
-  String get overrideFlag => url != null ? "  @override\n" : "";
+  String get extendsModel => url != null ? " extends UrlModel" : " extends Model";
+  String get overrideFlag => "  @override\n";
 
   String get content {
     final List<String> body = [];

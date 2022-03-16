@@ -35,7 +35,7 @@ class HttpMethods {
     var res = await Global.http.request("post", \"$url\", data: jsonData, queries: queries);
     if(serialize) {
       // Don't update slave forign members in create to avoid erasing newly added associated data
-      fromJson(res?.data, slave:false);
+      fromJson(res?.data);
     }
     return res;
   }
@@ -51,7 +51,7 @@ class HttpMethods {
     var res = await Global.http.request("put", \"$url\", data: jsonData, queries: queries);
     if(serialize) {
       // Don't update slave forign members in create to avoid erasing newly added associated data
-      fromJson(res?.data, slave:false);
+      fromJson(res?.data);
     }
     return res;
   }

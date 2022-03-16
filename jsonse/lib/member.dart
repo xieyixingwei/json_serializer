@@ -121,7 +121,7 @@ class Member {
       if (value.startsWith("\$")) {
         modelTypeJsonName = value.substring(1).trim();
         _unListType = toModelType(modelTypeJsonName!);
-        init = "$_unListType()";
+        init = null;
       }
       else if(value.trim().startsWith("DateTime")) {
         isDateTime = true;
@@ -188,6 +188,8 @@ class Member {
     }
   }
 
+  String get memberType => isList || isModelType ? "<$unListType>" : "";
+
   String get member {
     if(isStatic) {
       return "static $type $name = $init;";
@@ -205,19 +207,18 @@ class Member {
   String? get fromJson {
     // ignore member which name start with "__"
     if(notFromJson) return null;
-    return "$name.fromJson(json);";
+    return "$name.fromJson$memberType(json);";
   }
 
   String get from {
     if (isStatic) return "";
-    return isFileType ? "$name.from($from);" : "$name.from(instance.$name);";
+    return isFileType ? "$name.from($from);" : "$name.from$memberType(instance.$name);";
   }
 
   String? get editWidget {
     if(isStatic) {
       return null;
     }
-    final memberType = isList || isModelType ? "<$unListType>" : "";
     final update = isList || isModelType ? "update: update" : "";
     return "$name.editWidget$memberType($update),";
   }
