@@ -49,11 +49,16 @@ class Member {
   bool isStatic = false;
   bool isNested = false;
   bool isDateTime = false;
+  bool isNull = true;
 
   static final keyDecorators = [
     {
       "name": "@pk",
       "set": (Member m) {m.isPrimaryKey = true;},
+    },
+    {
+      "name": "@notnull",
+      "set": (Member m) {m.isNull = false;},
     },
     {
       "name": "@static",
@@ -107,21 +112,23 @@ class Member {
   void _parseValue(dynamic value) {
     if(value is bool) {
       _unListType = "bool";
-      init = value.toString();
     }
     else if(value is double) {
       _unListType = "double";
-      init = value.toString();
+      if(value != 0) {
+        init = value.toString();
+      }
     }
     else if(value is num) {
       _unListType = "num";
-      init = value.toString();
+      if(value != 0) {
+        init = value.toString();
+      }
     }
     else if(value is String) {
       if (value.startsWith("\$")) {
         modelTypeJsonName = value.substring(1).trim();
         _unListType = toModelType(modelTypeJsonName!);
-        init = null;
       }
       else if(value.trim().startsWith("DateTime")) {
         isDateTime = true;
@@ -132,23 +139,22 @@ class Member {
       }
       else {
         _unListType = "String";
-        init = "\"$value\"";
+        if(value.trim().isNotEmpty) {
+          init = "\"$value\"";
+        }
       }
     }
     else if(value is Map) {
       _unListType = "Map<String, dynamic>";
-      init = "{}";
       isMap = true;
     }
     else if(value is List) {
       isList = true;
       if(value.length == 0) {
         _unListType = "dynamic";
-        init = "[]";
       }
       else {
         _parseValue(value.first);
-        init = init != null ? "[]" : null;
       }
     }
   }
