@@ -92,6 +92,14 @@ class Model {
 """;
   }
 
+  String get primaryMemberGetter {
+    if(url == null) return "";
+    return
+"""  @override
+  get primaryMember => ${primaryMember.name};
+""";
+  }
+
   String get toJsonMembers =>
     members.map((e) => e.toJson).where((e) => e != null).join("\n    ");
   String get toJson =>
@@ -188,6 +196,8 @@ class Model {
       body.add(pkGetter);
       body.add("\n");
       body.add(pkSetter);
+      body.add("\n");
+      body.add(primaryMemberGetter);
       body.add("\n");
     }
 
