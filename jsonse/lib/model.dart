@@ -113,10 +113,11 @@ class Model {
 
   String get fromJsonMembers =>
     members.map((e) => e.fromJson).where((e) => e != null).join("\n    ");
+  String get checkIsExist => url != null ? "\n    isExist = (pk != null);" : "";
   String get fromJson =>
 """  $modelTypeName fromJson(Map<String, dynamic>? json) {
     if(json == null) return this;
-    $fromJsonMembers
+    $fromJsonMembers$checkIsExist
     return this;
   }
 """;
@@ -124,10 +125,11 @@ class Model {
   String get fromMembers => members.map((e) => e.from).where((e) => e.isNotEmpty).join("\n    ");
   String get fromType => "Model";
   String get asFromType => "\n    instance as $modelTypeName?;";
+  String get isExist => url != null ? "\n    isExist = instance.isExist;" : "";
   String get from =>
 """  $fromType from($fromType? instance) {$asFromType
     if(instance == null) return this;
-    $fromMembers
+    $fromMembers$isExist
     return this;
   }
 """;
