@@ -50,6 +50,14 @@ class Model {
       "name": "__http__",
       "set": (Model m, dynamic val) => m.httpMethods = HttpMethods(m, val),
     },
+    {
+      "name": "__abstract__",
+      "set": (Model m, dynamic val) => m.isAbstract = true,
+    },
+    {
+      "name": "__extends__",
+      "set": (Model m, dynamic val) => m.extendFather = (val as String).replaceAll("\$", ""),
+    },
   ];
 
   final JsonSerialize jsonSerialize;
@@ -58,6 +66,8 @@ class Model {
   String? url;
   HttpMethods? httpMethods;
   List<Member> members = [];
+  String? extendFather;
+  bool isAbstract = false;
 
   String get httpMethodsStr => httpMethods != null ? httpMethods!.methods.join("\n") : "";
 
@@ -169,6 +179,9 @@ class Model {
     imports.add("import \'package:flutter/material.dart\';");
     imports.add("import \'common/model.dart\';");
     imports.add("import \'common/member.dart\';");
+    if(extendFather != null) {
+      imports.add("import \'$extendFather.dart\';");
+    }
     return imports.where((e) => e.isNotEmpty) .join("\n") + "\n";
   }
 
@@ -177,8 +190,17 @@ class Model {
     return "  ${array.join("\n  ")}\n";
   }
 
-  String get extendsModel => url != null ? " extends UrlModel" : " extends Model";
+  String get extendsModel {
+    var ret = url != null ? " extends UrlModel" : " extends Model";
+    if(extendFather != null) {
+      ret = "$ret, ${toModelType(extendFather!)}";
+    }
+    return ret;
+  }
+
   String get overrideFlag => "  @override\n";
+
+  String get abstract => isAbstract ? "abstract " : "";
 
   String get content {
     final List<String> body = [];
@@ -187,7 +209,7 @@ class Model {
     body.add("// **************************************************************************\n");
     body.add(imports);
     body.add("\n");
-    body.add("class $modelTypeName$extendsModel {\n");
+    body.add("$abstract class $modelTypeName$extendsModel {\n");
     body.add("\n");
     body.add(classMembers);
     body.add("\n");
