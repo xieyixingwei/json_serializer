@@ -1,13 +1,6 @@
 import 'package:jsonse/model.dart';
 import 'package:collection/collection.dart';
 
-enum ForeignType {
-  Non,
-  ManyToOne,
-  ManyToMany,
-  OneToOne
-}
-
 // 首字母大写
 String _capitalize(String str) => "${str[0].toUpperCase()}${str.substring(1)}";
 
@@ -38,17 +31,14 @@ class Member {
   String? init;  // is the initial value of member
   String? modelTypeJsonName;
 
-  late List<Member> membersForeignToMeOfTypeSerializer;
   bool isPrimaryKey = false;
   bool isList = false;
   bool isMap = false;
-  ForeignType foreignType = ForeignType.Non;
-  bool notFromJson = false;
+  bool isForeign = false;
   bool notToJson = false;
   bool isFileType =false;
   bool isStatic = false;
   bool isNested = false;
-  bool isDateTime = false;
   bool isNull = true;
 
   static final keyDecorators = [
@@ -57,12 +47,16 @@ class Member {
       "set": (Member m) {m.isPrimaryKey = true;},
     },
     {
+      "name": "@foreign",
+      "set": (Member m) {m.isForeign = true;},
+    },
+    {
       "name": "@notnull",
       "set": (Member m) {m.isNull = false;},
     },
     {
       "name": "@static",
-      "set": (Member m) {m.isStatic = true; m.notToJson = true; m.notFromJson = true;},
+      "set": (Member m) {m.isStatic = true; m.notToJson = true;},
     },
     {
       "name": "@file",
@@ -87,15 +81,9 @@ class Member {
   ];
 
   void _parseKey(String key) {
-
-    if (key.startsWith("___")) {
-      notFromJson = true; // the member is not in fromJson
-      notToJson = true; // the member is not in toJson
-    }
-    else if (key.startsWith("__"))
-      notFromJson = true;
-    else if (key.startsWith("_"))
+    if (key.startsWith("_")) {
       notToJson = true;
+    }
 
     keyDecorators.forEach((e) {
       final name = e["name"] as String;
@@ -131,7 +119,6 @@ class Member {
         _unListType = toModelType(modelTypeJsonName!);
       }
       else if(value.trim().startsWith("DateTime")) {
-        isDateTime = true;
         _unListType = "DateTime";
         final v = value.trim().replaceFirst("DateTime", "").trim();
         if(v.isNotEmpty)
@@ -202,31 +189,9 @@ class Member {
     }
     final value = init != null ? ", value: $init" : "";
     final creator = isModelType ? ", creator: () => $unListType()" : "";
-    return "final $name = Member<$type>(name: \"$name\"$value$creator);";
-  }
-
-  String? get toJson {
-    if(notToJson) return null; // ignore member which name start with "_"
-    return "ret.addAll($name.toJson());";
-  }
-
-  String? get fromJson {
-    // ignore member which name start with "__"
-    if(notFromJson) return null;
-    return "$name.fromJson$memberType(json);";
-  }
-
-  String get from {
-    if (isStatic) return "";
-    return isFileType ? "$name.from($from);" : "$name.from$memberType(instance.$name);";
-  }
-
-  String? get editWidget {
-    if(isStatic) {
-      return null;
-    }
-    final update = isList || isModelType ? "update: update" : "";
-    return "$name.editWidget$memberType($update),";
+    final foreign = isForeign ? ", isForeign: true" : "";
+    final isToJson = notToJson ? ", isToJson: false" : "";
+    return "final $name = Member<$type, $unListType>(name: \"$name\"$value$creator$foreign$isToJson);";
   }
 
   String? get addToFormData => isFileType ? "if($name.mptFile != null) formData.files.add($name.file);" : null;
