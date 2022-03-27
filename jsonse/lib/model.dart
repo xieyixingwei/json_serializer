@@ -89,27 +89,10 @@ class Model {
 """;
   }
 
-  String get pkSetter {
-    if(url == null) return "";
+  String get newInstance {
     return
 """  @override
-  set pk(primarykey) => ${primaryMember.name}.value = primarykey;
-""";
-  }
-
-  String get pkGetter {
-    if(url == null) return "";
-    return
-"""  @override
-  get pk => ${primaryMember.name}.value;
-""";
-  }
-
-  String get primaryMemberGetter {
-    if(url == null) return "";
-    return
-"""  @override
-  get primaryMember => ${primaryMember.name};
+  $modelTypeName get newInstance => $modelTypeName();
 """;
   }
 
@@ -187,16 +170,12 @@ class Model {
     body.add(classMembers);
     body.add("\n");
     body.add(classMembersGetter);
+    body.add("\n");
+    body.add(newInstance);
 
     if(url != null) {
       body.add("\n");
       body.add(urlGetter);
-      body.add("\n");
-      body.add(pkGetter);
-      body.add("\n");
-      body.add(pkSetter);
-      body.add("\n");
-      body.add(primaryMemberGetter);
     }
 
     if(httpMethods != null) {

@@ -189,9 +189,10 @@ class Member {
     }
     final value = init != null ? ", value: $init" : "";
     final creator = isModelType ? ", creator: () => $unListType()" : "";
+    final isPk = isPrimaryKey ? ", isPk: true" : "";
     final foreign = isForeign ? ", isForeign: true" : "";
     final isToJson = notToJson ? ", isToJson: false" : "";
-    return "final $name = Member<$type, $unListType>(name: \"$name\"$value$creator$foreign$isToJson);";
+    return "final $name = Member<$type, $unListType>(name: \"$name\"$value$creator$isPk$foreign$isToJson);";
   }
 
   String? get addToFormData => isFileType ? "if($name.mptFile != null) formData.files.add($name.file);" : null;
