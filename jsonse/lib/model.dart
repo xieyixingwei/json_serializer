@@ -118,10 +118,15 @@ class Model {
     var imports = members.map((e) => e.importModels).toSet();
     if(httpMethods != null) {
       imports.add("import \'package:dio/dio.dart\' as dio;");
-      imports.add("import \'${jsonSerialize.config["http_file"]}\';");
+      imports.add("import \'common/http_mixin.dart\';");
     }
     if(!isMixin) {
-      imports.add("import \'common/model.dart\';");
+      if(url != null) {
+        imports.add("import \'common/url_model.dart\';");
+      }
+      else {
+        imports.add("import \'common/model.dart\';");
+      }
     }
     imports.add("import \'common/member.dart\';");
     for(var e in mixins) {
