@@ -51,13 +51,24 @@ class Model {
       "set": (Model m, dynamic val) => m.httpMethods = HttpMethods(m, val),
     },
     {
-      "name": "__mixin__",
+      "name": "__abstract__",
       "set": (Model m, dynamic val) {
-        if(val is bool) {
-          m.isMixin = val;
+        m.isAbstract = val;
+      }
+    },
+    {
+      "name": "__extends__",
+      "set": (Model m, dynamic val) {
+        if("$val".startsWith("\$")) {
+          m.father = val.replaceAll("\$", "");
         }
-        else if(val is String) {
-          m.mixins.add(val.replaceAll("\$", ""));
+        else {
+          final tmp = "$val".split(".dart/");
+          if(tmp.length != 2) {
+            throw(StateError("*** ERROR: ${m.jsonName}'s format of __extends__ error."));
+          }
+          m.fatherPath = tmp.first;
+          m.father = tmp.last;
         }
       }
     },
@@ -69,8 +80,9 @@ class Model {
   String? url;
   HttpMethods? httpMethods;
   List<Member> members = [];
-  bool isMixin = false;
-  List<String> mixins = [];
+  bool isAbstract = false;
+  String father = "";
+  String fatherPath = "";
 
   String get httpMethodsStr => httpMethods != null ? httpMethods!.methods.join("\n") : "";
 
@@ -120,18 +132,20 @@ class Model {
       imports.add("import \'package:dio/dio.dart\' as dio;");
       imports.add("import \'common/http_mixin.dart\';");
     }
-    if(!isMixin) {
-      if(url != null) {
-        imports.add("import \'common/url_model.dart\';");
-      }
-      else {
-        imports.add("import \'common/model.dart\';");
-      }
+    if(fatherPath.isNotEmpty) {
+      imports.add("import \'$fatherPath.dart\';");
     }
+    else if(father.isNotEmpty) {
+      imports.add("import \'$father.dart\';");
+    }
+    else if(url != null) {
+      imports.add("import \'common/url_model.dart\';");
+    }
+    else {
+      imports.add("import \'common/model.dart\';");
+    }
+
     imports.add("import \'common/member.dart\';");
-    for(var e in mixins) {
-      imports.add("import \'$e.dart\';");
-    }
     return imports.where((e) => e.isNotEmpty) .join("\n") + "\n";
   }
 
@@ -142,21 +156,25 @@ class Model {
 
   String get classMembersGetter {
     var array = members.where((e) => !e.isStatic).map((e) => e.name).toList();
-    var getterName = isMixin ? "${jsonName}Members" : "members";
+    var getterName = isAbstract ? "${jsonName}Members" : "members";
+    var override = isAbstract ? "" : "  @override";
     var addMembers = "";
-    if(!isMixin && mixins.isNotEmpty) {
-      addMembers += " + ${mixins.map((e) => "${e}Members").join(" + ")}";
+    if(!isAbstract && father.isNotEmpty) {
+      addMembers += " + ${father}Members";
     }
     return
-"""  @override
+"""$override
   List<Member> get $getterName => <Member>[${array.join(", ")}]$addMembers;
 """;
   }
 
   String get extendsModel {
     var ret = url != null ? " extends UrlModel" : " extends Model";
-    if(mixins.isNotEmpty) {
-      ret += " with ${mixins.map((e) => toModelType(e)).join(", ")}";
+    if(father.isNotEmpty && fatherPath.isNotEmpty) {
+      ret = " extends $father";
+    }
+    else if(father.isNotEmpty) {
+      ret = " extends ${toModelType(father)}";
     }
     return ret;
   }
@@ -191,14 +209,14 @@ class Model {
     return body.where((e) => e.isNotEmpty).join("");
   }
 
-  String get modelMixin {
+  String get abstractModel {
     final List<String> body = [];
     body.add("// **************************************************************************\n");
     body.add("// GENERATED CODE BY jsonse - DO NOT MODIFY BY HAND\n");
     body.add("// **************************************************************************\n");
     body.add(imports);
     body.add("\n");
-    body.add("mixin $modelTypeName {\n");
+    body.add("abstract class $modelTypeName $extendsModel {\n");
     body.add("\n");
     body.add(classMembers);
     body.add("\n");
@@ -211,6 +229,6 @@ class Model {
     //if(members.where((e) => e.isFileType).isNotEmpty) await SingleFileType().save(distPath);
     if (!path.basename(dist).endsWith(".dart")) 
       dist = path.join(dist, "$jsonName.dart");
-    File(dist).openWrite().write(isMixin ? modelMixin : modelClass);
+    File(dist).openWrite().write(isAbstract ? abstractModel : modelClass);
   }
 }
