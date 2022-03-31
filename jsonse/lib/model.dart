@@ -93,6 +93,13 @@ class Model {
     return fund;
   }
 
+  String get modelNameGetter {
+    return
+"""  @override
+  String get modelName => "$jsonName";
+""";
+  }
+
   String get urlGetter {
     if(url == null) return "";
     return
@@ -193,6 +200,8 @@ class Model {
     body.add(classMembers);
     body.add("\n");
     body.add(classMembersGetter);
+    body.add("\n");
+    body.add(modelNameGetter);
     body.add("\n");
     body.add(newInstance);
 
