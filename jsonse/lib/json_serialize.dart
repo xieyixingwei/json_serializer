@@ -9,58 +9,63 @@ class JsonSerialize {
 
   JsonSerialize({
     required String input,
-    required this.output,
-    required String configfile }) {
+    required String output,
+    required String configfile
+  }) {
+    init(input, output, configfile);
+  }
 
+  late final String outputDir;
+  late final String outputDirName;
+  late final Map<String, dynamic> config;
+
+  final List<String> jsons = [];
+  final List<Model> models = [];
+
+  void init(String input, String output, String configfile) {
     final inf = File(input);
-    if (inf.statSync().type == FileSystemEntityType.notFound) {
-      print("*** ERROR: $input is not exist.");
-      return;
+
+    if(inf.statSync().type == FileSystemEntityType.notFound) {
+      throw(StateError("*** ERROR: $input is not exist."));
     }
 
-    if (inf.statSync().type == FileSystemEntityType.directory) {
-      final d = Directory(input);
-      d.listSync(recursive: true).forEach((e) {
-        final jf = File(e.path);
-        if ( jf.statSync().type == FileSystemEntityType.file
-          && jf.path.endsWith(".json")
-          && !path.basename(jf.path).startsWith("_")
-          && path.basename(jf.path) != "_config.json") {
-          jsons.add(e.path);
-        }
-      });
-
-      if (output == "models") {
-        final parentDir = d.parent.uri.toFilePath(windows:Platform.isWindows);
-        output = path.join(parentDir, output);
-      }
-      final out = Directory(output);
-      if(!out.existsSync())
-        out.createSync(recursive:true);
-
-      if (configfile == "_config.json") {
-        final configDir = d.uri.toFilePath(windows:Platform.isWindows);
-        configfile = path.join(configDir, configfile);
-      }
+    if(inf.statSync().type != FileSystemEntityType.directory) {
+      throw(StateError("*** ERROR: $input must be a directory."));
     }
-    else if (inf.statSync().type == FileSystemEntityType.file) {
-      jsons.add(input);
 
-      if (!path.basename(output).endsWith(".dart"))
-        output = path.dirname(input);
+    final ind = Directory(input);
+    ind.listSync(recursive: true).forEach((e) {
+      final jf = File(e.path);
+      if ( jf.statSync().type == FileSystemEntityType.file
+        && jf.path.endsWith(".json")
+        && !path.basename(jf.path).startsWith("_")
+        && path.basename(jf.path) != "_config.json") {
+        jsons.add(e.path);
+      }
+    });
+
+    if(output == "models") {
+      final parentDir = ind.parent.uri.toFilePath(windows:Platform.isWindows);
+      output = path.join(parentDir, output);
+    }
+
+    outputDir = output;
+    outputDirName = path.basename(output);
+
+    final out = Directory(outputDir);
+    if(!out.existsSync()) {
+      out.createSync(recursive:true);
+    }
+
+    if(configfile == "_config.json") {
+      final configDir = ind.uri.toFilePath(windows:Platform.isWindows);
+      configfile = path.join(configDir, configfile);
     }
 
     final cf = File(configfile);
     if (cf.statSync().type == FileSystemEntityType.file)
       _parseConfigFile(cf);
   }
-
-  String output;
-  late final Map<String, dynamic> config;
-
-  List<String> jsons = [];
-  List<Model> models = [];
-  String? importHttpPackage;
 
   List<String> _splitJsons(String src) {
     List<String> ret = [];
@@ -104,7 +109,7 @@ class JsonSerialize {
     try{
       config = json.decode(_removeComments(cf.readAsLinesSync()));
     } catch(e) {
-      print("*** ERROR: from \"$config\" parse Json Error: $e");
+      throw(StateError("*** ERROR: from \"$config\" parse Json Error: $e"));
     }
   }
 
@@ -113,17 +118,16 @@ class JsonSerialize {
       List<String> lines = File(json).readAsLinesSync();
       String src = _removeComments(lines);
       _splitJsons(src).forEach((e) =>
-        models.add(Model(jsonSerialize:this, jsonName: path.basenameWithoutExtension(json), jsonSrc:e))
+        models.add(Model(serializer:this, jsonName: path.basenameWithoutExtension(json), jsonSrc:e))
       );
     });
 
     await Future.forEach<Model>(models,
       (e) async {
         try {
-          await e.save(output);
+          await e.save(outputDir);
         } catch(error) {
-          print("*** Error: ${e.jsonName}.json");
-          print(error);
+          throw(StateError("*** Error: ${e.jsonName}.json $error"));
         }
       } 
     );

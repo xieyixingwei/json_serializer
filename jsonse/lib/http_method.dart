@@ -5,7 +5,7 @@ class HttpMethods {
   HttpMethods(this.fatherModel, this.https);
 
   final List https;
-  final Model fatherModel;
+  final AbstractModel fatherModel;
 
   List<String> get methods {
     return https.map((e) {

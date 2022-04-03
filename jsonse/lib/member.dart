@@ -4,7 +4,7 @@ import 'package:collection/collection.dart';
 // 首字母大写
 String _capitalize(String str) => "${str[0].toUpperCase()}${str.substring(1)}";
 
-String _reName(String name) {
+String trimName(String name) {
   name = name.trim();
   name = name.indexOf("_") > 0
         ? name.split("_").map<String>((String e) => _capitalize(e)).toList().join("")
@@ -12,7 +12,7 @@ String _reName(String name) {
   return name;
 }
 
-String toModelType(String name) => "${_reName(name)}Model";
+String toModelType(String name) => "${trimName(name)}Model";
 
 class Member {
 
@@ -25,7 +25,7 @@ class Member {
     _parseValue(value);
   }
 
-  final Model fatherModel;
+  final AbstractModel fatherModel;
   late String name;  // is the name of member
   late String _unListType;  // is the type of member(Exclude List), eg: bool, num, double, String, Map, NameSerializer
   String? init;  // is the initial value of member
@@ -150,7 +150,7 @@ class Member {
     if(isNested)
       return _unListType;
     // the type of foreign member is the type of foreign to Model's primary key
-    if(fatherModel.jsonSerialize.config["foreign_type"] == "pk")
+    if(fatherModel.serializer.config["foreign_type"] == "pk")
       return typeModel.primaryMember.type;
     return _unListType;
   }
@@ -171,7 +171,7 @@ class Member {
 
   Model get typeModel {
     try{
-      final found = fatherModel.jsonSerialize.models.singleWhereOrNull((e) => e.jsonName == modelTypeJsonName);
+      final found = fatherModel.serializer.models.singleWhereOrNull((e) => e.jsonName == modelTypeJsonName);
       if (found == null)
         throw(StateError("*** ERROR: can\'t find \"$modelTypeJsonName\" during build \"${fatherModel.jsonName}\"."));
       else
@@ -183,7 +183,8 @@ class Member {
 
   String get memberType => isList || isModelType ? "<$unListType>" : "";
 
-  String get member {
+  @override
+  String toString() {
     if(isStatic) {
       return "static $type $name = $init;";
     }

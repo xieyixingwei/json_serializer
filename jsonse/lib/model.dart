@@ -2,63 +2,43 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:collection/collection.dart';
 import 'package:jsonse/http_method.dart';
+import 'package:jsonse/model_mixins.dart';
 import 'package:path/path.dart' as path;
 import 'package:jsonse/member.dart';
 import 'package:jsonse/json_serialize.dart';
 
-class Model {
+abstract class AbstractModel {
 
-  Model({
-    required this.jsonSerialize,
+  AbstractModel({
+    required this.serializer,
     required this.jsonName,
-    required String jsonSrc }) {
-
-    var obj;
-    try{
-      obj = json.decode(jsonSrc);
-    } catch(e) {
-      print("*** ERROR: from \"${this.jsonName}.json\" parse Json Error: $e");
-      return;
-    }
-
-    keywords.forEach((e) {
-      final name = e["name"] as String;
-      final set = e["set"] as Function(Model, dynamic);
-      if (obj[name] != null) {
-        set(this, obj[name]);
-        obj.remove(name);
-      }
-    });
-
-    modelTypeName = toModelType(jsonName);
-
-    obj.forEach((String key, dynamic value) {
-      members.add(Member(fatherModel:this, key:key, value:value));
-    });
+    required this.jsonSrc
+  }) {
+    init();
   }
 
   static final keywords = [
     {
       "name": "__name__",
-      "set": (Model m, dynamic val) => m.jsonName = (val as String).trim(),
+      "set": (AbstractModel m, dynamic val) => m.jsonName = (val as String).trim(),
     },
     {
       "name": "__url__",
-      "set": (Model m, dynamic val) => m.url = val,
+      "set": (AbstractModel m, dynamic val) => m.url = val,
     },
     {
       "name": "__http__",
-      "set": (Model m, dynamic val) => m.httpMethods = HttpMethods(m, val),
+      "set": (AbstractModel m, dynamic val) => m.httpMethods = HttpMethods(m, val),
     },
     {
       "name": "__abstract__",
-      "set": (Model m, dynamic val) {
+      "set": (AbstractModel m, dynamic val) {
         m.isAbstract = val;
       }
     },
     {
       "name": "__extends__",
-      "set": (Model m, dynamic val) {
+      "set": (AbstractModel m, dynamic val) {
         if("$val".startsWith("\$")) {
           m.father = val.replaceAll("\$", "");
         }
@@ -72,19 +52,56 @@ class Model {
         }
       }
     },
+    {
+      "name": "__uneditable__",
+      "set": (AbstractModel m, dynamic val) {
+        m.uneditable = val.map<String>((e) => e as String).toList();
+      }
+    },
+    {
+      "name": "__filter__",
+      "set": (AbstractModel m, dynamic val) {
+        m.filter = (val as Map).map<String, List<String>>((key, value) {
+          return MapEntry(key, value.map<String>((e) => e as String).toList());
+        });
+      }
+    },
   ];
 
-  final JsonSerialize jsonSerialize;
+  final JsonSerialize serializer;
   String jsonName;
-  late final String modelTypeName;
+  final jsonSrc;
   String? url;
   HttpMethods? httpMethods;
   List<Member> members = [];
   bool isAbstract = false;
   String father = "";
   String fatherPath = "";
+  List<String> uneditable = [];
+  Map<String, List<String>> filter = {};
 
-  String get httpMethodsStr => httpMethods != null ? httpMethods!.methods.join("\n") : "";
+  void init() {
+    var obj;
+    try{
+      obj = json.decode(jsonSrc);
+    } catch(e) {
+      print("*** ERROR: from \"${this.jsonName}.json\" parse Json Error: $e");
+      return;
+    }
+
+    keywords.forEach((e) {
+      final name = e["name"] as String;
+      final set = e["set"] as Function(AbstractModel, dynamic);
+      if (obj[name] != null) {
+        set(this, obj[name]);
+        obj.remove(name);
+      }
+    });
+
+    obj.forEach((String key, dynamic value) {
+      members.add(Member(fatherModel:this, key:key, value:value));
+    });
+  }
 
   Member get primaryMember {
     final fund = members.firstWhereOrNull((e) => e.isPrimaryKey);
@@ -93,45 +110,8 @@ class Model {
     return fund;
   }
 
-  String get modelNameGetter {
-    return
-"""  @override
-  String get modelName => "$jsonName";
-""";
-  }
-
-  String get urlGetter {
-    if(url == null) return "";
-    return
-"""  @override
-  String get url => "$url";
-""";
-  }
-
-  String get newInstance {
-    return
-"""  @override
-  $modelTypeName get newInstance => $modelTypeName();
-""";
-  }
-
-  String get addToFormDataOfMembers => members.map((e) => e.addToFormData).where((e) => e != null).toList().join("\n    ");
-  String get removeMtpFiles => members.map((e) => e.removeMtpFile).where((e) => e != null).toList().join("\n      ");
-  bool get hasFileType => members.where((e) => e.isFileType).isNotEmpty;
-  String get uploadFile => hasFileType ?
-"""
-  Future<bool> uploadFile() async {
-    var jsonObj = {"${primaryMember.name}": ${primaryMember.name}};
-    var formData = FormData.fromMap(jsonObj, ListFormat.multi);
-    $addToFormDataOfMembers
-    bool ret = true;
-    if(formData.files.isNotEmpty) {
-      ret = await update(data:formData);
-      $removeMtpFiles
-    }
-    return ret;
-  }
-""" : "";
+  String get modelTypeName => toModelType(jsonName);
+  String get modelMixinName => "${trimName(jsonName)}Mixin";
 
   String get imports {
     var imports = members.map((e) => e.importModels).toSet();
@@ -152,28 +132,19 @@ class Model {
       imports.add("import \'common/model.dart\';");
     }
 
+    if(!isAbstract) {
+      imports.add("import \'../${serializer.outputDirName}_mixins/${jsonName}_mixin.dart\';");
+    }
+
+    if(filter.isNotEmpty) {
+      imports.add("import \'common/member_list_mixin.dart\';");
+    }
+
     imports.add("import \'common/member.dart\';");
     return imports.where((e) => e.isNotEmpty) .join("\n") + "\n";
   }
 
-  String get classMembers {
-    var array = members.map((e) => e.member).toList();
-    return "  ${array.join("\n  ")}\n";
-  }
-
-  String get classMembersGetter {
-    var array = members.where((e) => !e.isStatic).map((e) => e.name).toList();
-    var getterName = isAbstract ? "${jsonName}Members" : "members";
-    var override = isAbstract ? "" : "  @override";
-    var addMembers = "";
-    if(!isAbstract && father.isNotEmpty) {
-      addMembers += " + ${father}Members";
-    }
-    return
-"""$override
-  List<Member> get $getterName => <Member>[${array.join(", ")}]$addMembers;
-""";
-  }
+  String get classMembers => members.map((e) => "$e").join("\n  ");
 
   String get extendsModel {
     var ret = url != null ? " extends UrlModel" : " extends Model";
@@ -186,58 +157,73 @@ class Model {
     return ret;
   }
 
-  String get overrideFlag => "  @override\n";
-
-  String get modelClass {
+  String get initMethod {
     final List<String> body = [];
-    body.add("// **************************************************************************\n");
-    body.add("// GENERATED CODE BY jsonse - DO NOT MODIFY BY HAND\n");
-    body.add("// **************************************************************************\n");
-    body.add(imports);
-    body.add("\n");
-    body.add("class $modelTypeName$extendsModel {\n");
-    body.add("\n");
-    body.add(classMembers);
-    body.add("\n");
-    body.add(classMembersGetter);
-    body.add("\n");
-    body.add(modelNameGetter);
-    body.add("\n");
-    body.add(newInstance);
 
-    if(url != null) {
-      body.add("\n");
-      body.add(urlGetter);
+    // add uneditable members
+    body.add("// set the editable of members");
+    for(var name in uneditable) {
+      body.add("$name.isEditable = false;");
     }
 
-    if(httpMethods != null) {
-      body.add("\n");
-      body.add(httpMethodsStr);
+    body.add("// set the filter of members");
+    for(var name in filter.keys) {
+      var memerName = name;
+      if(name.contains("->")) {
+        final tmp = name.split("->");
+        memerName = tmp.last.trim();
+        body.add("$memerName.filterAlias = \"${tmp.first.trim()}\";");
+      }
+      body.add("$memerName.supportedFilterTypes = [${filter[name]!.map((e) => "FilterType.$e").join(", ")}];");
     }
-    body.add("}");
-    return body.where((e) => e.isNotEmpty).join("");
+
+    body.removeWhere((e) => e.isEmpty);
+
+    if(body.isEmpty) {
+      return "";
+    }
+
+    return
+"""  @override
+  void init() {
+    super.init();
+    ${body.join("\n    ")}
+  }
+""";
   }
 
-  String get abstractModel {
-    final List<String> body = [];
-    body.add("// **************************************************************************\n");
-    body.add("// GENERATED CODE BY jsonse - DO NOT MODIFY BY HAND\n");
-    body.add("// **************************************************************************\n");
-    body.add(imports);
-    body.add("\n");
-    body.add("abstract class $modelTypeName $extendsModel {\n");
-    body.add("\n");
-    body.add(classMembers);
-    body.add("\n");
-    body.add(classMembersGetter);
-    body.add("}");
-    return body.where((e) => e.isNotEmpty).join("");
-  }
+  String get modelClass;
+
+  String get abstractModelClass;
+
+  String get modelMixinClass;
 
   Future save(String dist) async {
-    //if(members.where((e) => e.isFileType).isNotEmpty) await SingleFileType().save(distPath);
-    if (!path.basename(dist).endsWith(".dart")) 
-      dist = path.join(dist, "$jsonName.dart");
-    File(dist).openWrite().write(isAbstract ? abstractModel : modelClass);
+    final modelFile = path.join(dist, "${jsonName}.dart");
+    File(modelFile).openWrite().write(isAbstract ? abstractModelClass : modelClass);
+
+    if(!isAbstract) {
+      final parentDir = Directory(dist).parent.uri.toFilePath(windows:Platform.isWindows);
+      final modelDirName = path.basename(dist);
+      final modelMixinDir = path.join(parentDir, "${modelDirName}_mixins");
+      final d = Directory(modelMixinDir);
+      if(!d.existsSync()) {
+        d.createSync(recursive:true);
+      }
+
+      final modelMixinFile = path.join(modelMixinDir, "${jsonName}_mixin.dart");
+      final mixinFile = File(modelMixinFile);
+      if(!mixinFile.existsSync()) {
+        mixinFile.openWrite().write(modelMixinClass);
+      }
+    }
   }
+}
+
+class Model extends AbstractModel with ModelClass, ModelMixinClass, AbstractModelClass {
+  Model({
+    required JsonSerialize serializer,
+    required String jsonName,
+    required String jsonSrc
+  }) : super(serializer: serializer, jsonName: jsonName, jsonSrc: jsonSrc);
 }
