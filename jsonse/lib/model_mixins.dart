@@ -132,16 +132,15 @@ mixin ModelMixinClass on AbstractModel {
   $modelTypeName get self => this as $modelTypeName;
 
   @override
-  List<Widget> toEditWidgets() {
+  List<Widget> toEditWidgets({void Function()? update}) {
     // implement your edit widget settings
-    return super.toEditWidgets();
+    return super.toEditWidgets(update: update);
   }
 
   @override
-  void init() {
-    super.init();
+  List<ListTableCell> get listTableCells => [
     // add your custom initial
-  }
+  ];
 
   @override
   Widget toWidget({void Function()? update}) {
